@@ -1,0 +1,29 @@
+# Levanta backend y frontend juntos, en contenedores, con un solo comando.
+# La base de datos NO va aca -- vive en Neon (nube), así que no hace falta
+# un contenedor de Postgres local.
+#
+# Uso, desde la raiz del proyecto:
+#   docker compose -f infra/docker-compose.yml up --build
+#
+# Requiere que backend/.env ya exista con tus credenciales reales.
+
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    env_file:
+      - ../backend/.env
+    ports:
+      - "8000:8000"
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8000
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend

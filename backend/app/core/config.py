@@ -16,7 +16,8 @@ class Settings(BaseSettings):
     resend_api_key: str
     email_from: str
 
-    # URL del frontend, para armar el link que se envia en el correo
+    # URL del frontend: se usa para armar el link del correo de recuperacion
+    # y como origen permitido en CORS
     frontend_url: str = "http://localhost:5173"
 
 

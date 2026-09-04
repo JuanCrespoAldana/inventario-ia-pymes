@@ -75,7 +75,7 @@ export function RegisterPage() {
         <FormField
           label="Correo electrónico"
           type="email"
-          placeholder="correo@empresa.com"
+          placeholder="Ingresa tu correo"
           error={errors.email?.message}
           {...registrarCampo("email")}
         />
