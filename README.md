@@ -10,3 +10,7 @@ Proyecto de grado — sistema de inventarios multi-sede con predicción de deman
 - `agents/` — Agentes de IA para recomendaciones (CrewAI)
 - `infra/` — Docker y configuración de despliegue
 - `docs/` — Diagramas y decisiones de arquitectura
+
+## Usuario admin de empresa StockTech:
+Correo: juancrespoaldana@gmail.com
+Contraseña: Juan123%

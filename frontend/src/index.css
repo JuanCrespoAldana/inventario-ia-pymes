@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Space Grotesk", ui-sans-serif, sans-serif;
+  --font-sans: "Plus Jakarta Sans", ui-sans-serif, sans-serif;
+
+  --color-bg: #0A0A0F;
+  --color-surface: #131319;
+  --color-surface-2: #1A1A22;
+  --color-line: rgba(255, 255, 255, 0.08);
+  --color-line-strong: rgba(255, 255, 255, 0.16);
+  --color-accent: #4C6FFF;
+  --color-accent-light: #8AA3FF;
+  --color-accent-dim: rgba(76, 111, 255, 0.14);
+  --color-ink: #F5F6FA;
+  --color-ink-dim: #9497A6;
+  --color-ink-faint: #63656F;
+  --color-success: #34D399;
+  --color-success-dim: rgba(52, 211, 153, 0.14);
+  --color-warning: #FBBF24;
+  --color-warning-dim: rgba(251, 191, 36, 0.14);
+  --color-danger: #F87171;
+  --color-danger-dim: rgba(248, 113, 113, 0.14);
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: white;
+}
