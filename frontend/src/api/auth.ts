@@ -16,9 +16,17 @@ export async function olvidePassword(email: string) {
   return data
 }
 
-export async function restablecerPassword(token: string, nueva_password: string) {
+export async function verificarCodigo(email: string, codigo: string) {
+  const { data } = await api.post<{ session_token: string }>("/api/auth/verify-reset-code", {
+    email,
+    codigo,
+  })
+  return data
+}
+
+export async function restablecerPassword(session_token: string, nueva_password: string) {
   const { data } = await api.post<{ mensaje: string }>("/api/auth/reset-password", {
-    token,
+    session_token,
     nueva_password,
   })
   return data

@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 
@@ -6,12 +7,16 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.email import enviar_email_recuperacion
+from app.core.email import enviar_codigo_recuperacion
 from app.core.security import create_access_token, hash_password, verify_password
 from app.models.empresa import Empresa
 from app.models.password_reset_token import PasswordResetToken
 from app.models.usuario import RolUsuario, Usuario
 from app.schemas.usuario import UsuarioCreate
+
+logger = logging.getLogger(__name__)
+
+MAX_INTENTOS_CODIGO = 5
 
 
 class EmailYaRegistradoError(Exception):
@@ -24,6 +29,12 @@ class EmpresaNoConfiguradaError(Exception):
 
 class CredencialesInvalidasError(Exception):
     pass
+
+
+class CodigoInvalidoError(Exception):
+    def __init__(self, intentos_restantes: int = 0):
+        self.intentos_restantes = intentos_restantes
+        super().__init__()
 
 
 class TokenInvalidoError(Exception):
@@ -69,36 +80,83 @@ def generar_token_acceso(usuario: Usuario) -> str:
     return create_access_token({"sub": str(usuario.id), "rol": usuario.rol.value})
 
 
+def _asegurar_tz(momento: datetime) -> datetime:
+    # Algunos drivers (ej. sqlite) devuelven datetimes sin tz; se asume UTC
+    if momento.tzinfo is None:
+        return momento.replace(tzinfo=timezone.utc)
+    return momento
+
+
 async def solicitar_recuperacion(db: AsyncSession, email: str) -> None:
     usuario = await db.scalar(select(Usuario).where(Usuario.email == email))
     if not usuario:
         # No revelamos si el correo existe o no -> evita enumeracion de usuarios
         return
 
-    token_raw = secrets.token_urlsafe(32)
-    token_hash = hashlib.sha256(token_raw.encode()).hexdigest()
+    codigo = f"{secrets.randbelow(1_000_000):06d}"
+    codigo_hash = hashlib.sha256(codigo.encode()).hexdigest()
     expira = datetime.now(timezone.utc) + timedelta(minutes=settings.reset_token_expire_minutes)
 
-    db.add(PasswordResetToken(usuario_id=usuario.id, token_hash=token_hash, expires_at=expira))
+    db.add(PasswordResetToken(usuario_id=usuario.id, codigo_hash=codigo_hash, expires_at=expira))
     await db.commit()
 
-    enlace = f"{settings.frontend_url}/reset-password?token={token_raw}"
-    await enviar_email_recuperacion(usuario.email, usuario.nombre, enlace)
+    try:
+        await enviar_codigo_recuperacion(usuario.email, usuario.nombre, codigo)
+    except Exception:
+        # Si el envio falla (proveedor caido, restriccion de remitente, etc.)
+        # no debe tumbar la peticion ni revelar nada distinto al caso normal.
+        # El codigo ya quedo guardado -- queda en el log del servidor para
+        # que un administrador pueda revisarlo.
+        logger.exception("No se pudo enviar el codigo de recuperacion a %s", usuario.email)
 
 
-async def restablecer_password(db: AsyncSession, token_raw: str, nueva_password: str) -> None:
-    token_hash = hashlib.sha256(token_raw.encode()).hexdigest()
+async def verificar_codigo(db: AsyncSession, email: str, codigo: str) -> str:
+    """Valida el PIN de 6 digitos. Si es correcto, devuelve un token de sesion
+    de un solo uso para el paso de crear la nueva contraseña."""
+    usuario = await db.scalar(select(Usuario).where(Usuario.email == email))
+    if not usuario:
+        raise CodigoInvalidoError()
+
     registro = await db.scalar(
-        select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash)
+        select(PasswordResetToken)
+        .where(
+            PasswordResetToken.usuario_id == usuario.id,
+            PasswordResetToken.used.is_(False),
+            PasswordResetToken.verificado.is_(False),
+        )
+        .order_by(PasswordResetToken.created_at.desc())
     )
 
     ahora = datetime.now(timezone.utc)
-    expira = registro.expires_at if registro else None
-    if expira is not None and expira.tzinfo is None:
-        # Algunos drivers (ej. sqlite) devuelven datetimes sin tz; se asume UTC
-        expira = expira.replace(tzinfo=timezone.utc)
+    if not registro or registro.intentos >= MAX_INTENTOS_CODIGO or _asegurar_tz(registro.expires_at) < ahora:
+        raise CodigoInvalidoError()
 
-    if not registro or registro.used or expira < ahora:
+    codigo_hash = hashlib.sha256(codigo.encode()).hexdigest()
+    if not secrets.compare_digest(codigo_hash, registro.codigo_hash):
+        registro.intentos += 1
+        await db.commit()
+        raise CodigoInvalidoError(intentos_restantes=MAX_INTENTOS_CODIGO - registro.intentos)
+
+    session_token_raw = secrets.token_urlsafe(32)
+    registro.session_token_hash = hashlib.sha256(session_token_raw.encode()).hexdigest()
+    registro.verificado = True
+    await db.commit()
+    return session_token_raw
+
+
+async def restablecer_password(db: AsyncSession, session_token: str, nueva_password: str) -> None:
+    session_hash = hashlib.sha256(session_token.encode()).hexdigest()
+    registro = await db.scalar(
+        select(PasswordResetToken).where(PasswordResetToken.session_token_hash == session_hash)
+    )
+
+    ahora = datetime.now(timezone.utc)
+    if (
+        not registro
+        or not registro.verificado
+        or registro.used
+        or _asegurar_tz(registro.expires_at) < ahora
+    ):
         raise TokenInvalidoError()
 
     usuario = await db.get(Usuario, registro.usuario_id)

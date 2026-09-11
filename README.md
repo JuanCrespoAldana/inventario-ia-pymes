@@ -13,4 +13,4 @@ Proyecto de grado — sistema de inventarios multi-sede con predicción de deman
 
 ## Usuario admin de empresa StockTech:
 Correo: juancrespoaldana@gmail.com
-Contraseña: Juan123%
+Contraseña: Juan%123

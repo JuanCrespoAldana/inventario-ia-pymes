@@ -11,6 +11,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from app.services.auth_service import (
+    CodigoInvalidoError,
     CredencialesInvalidasError,
     EmailYaRegistradoError,
     EmpresaNoConfiguradaError,
@@ -45,9 +46,17 @@ def registrar_manejadores_excepciones(app: FastAPI) -> None:
             content={"detail": "Correo o contraseña incorrectos"},
         )
 
+    @app.exception_handler(CodigoInvalidoError)
+    async def _codigo_invalido(request: Request, exc: CodigoInvalidoError) -> JSONResponse:
+        if exc.intentos_restantes > 0:
+            detalle = f"Código incorrecto. Te quedan {exc.intentos_restantes} intentos."
+        else:
+            detalle = "El código no es válido o ya venció. Solicita uno nuevo."
+        return JSONResponse(status_code=status.HTTP_400_BAD_REQUEST, content={"detail": detalle})
+
     @app.exception_handler(TokenInvalidoError)
     async def _token_invalido(request: Request, exc: TokenInvalidoError) -> JSONResponse:
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
-            content={"detail": "El enlace no es válido o ya venció"},
+            content={"detail": "La sesión de recuperación venció. Solicita un código nuevo."},
         )

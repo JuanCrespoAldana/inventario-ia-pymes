@@ -12,6 +12,8 @@ from app.schemas.usuario import (
     UsuarioCreate,
     UsuarioLogin,
     UsuarioOut,
+    VerifyResetCodeRequest,
+    VerifyResetCodeResponse,
 )
 from app.services import auth_service
 
@@ -42,12 +44,19 @@ async def iniciar_sesion(request: Request, datos: UsuarioLogin, db: AsyncSession
 @limiter.limit("3/minute")
 async def olvide_password(request: Request, datos: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
     await auth_service.solicitar_recuperacion(db, datos.email)
-    return {"mensaje": "Si el correo existe, vas a recibir un enlace para restablecer tu contraseña"}
+    return {"mensaje": "Si el correo existe, vas a recibir un código para restablecer tu contraseña"}
+
+
+@router.post("/verify-reset-code", response_model=VerifyResetCodeResponse)
+@limiter.limit("10/minute")
+async def verificar_codigo(request: Request, datos: VerifyResetCodeRequest, db: AsyncSession = Depends(get_db)):
+    session_token = await auth_service.verificar_codigo(db, datos.email, datos.codigo)
+    return VerifyResetCodeResponse(session_token=session_token)
 
 
 @router.post("/reset-password", status_code=status.HTTP_200_OK)
 async def restablecer(datos: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
-    await auth_service.restablecer_password(db, datos.token, datos.nueva_password)
+    await auth_service.restablecer_password(db, datos.session_token, datos.nueva_password)
     return {"mensaje": "Contraseña actualizada correctamente"}
 
 

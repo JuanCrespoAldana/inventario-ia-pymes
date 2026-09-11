@@ -12,12 +12,15 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60
     reset_token_expire_minutes: int = 30
 
-    # Email (recuperacion de contraseña) - Resend
-    resend_api_key: str
+    # Email (recuperacion de contraseña) - Gmail SMTP
+    # Funciona para CUALQUIER destinatario sin necesitar dominio propio verificado.
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_user: str
+    smtp_password: str
     email_from: str
 
-    # URL del frontend: se usa para armar el link del correo de recuperacion
-    # y como origen permitido en CORS
+    # URL del frontend: se usa como origen permitido en CORS
     frontend_url: str = "http://localhost:5173"
 
 

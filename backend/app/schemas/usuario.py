@@ -39,8 +39,17 @@ class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
 
+class VerifyResetCodeRequest(BaseModel):
+    email: EmailStr
+    codigo: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
+class VerifyResetCodeResponse(BaseModel):
+    session_token: str
+
+
 class ResetPasswordRequest(BaseModel):
-    token: str
+    session_token: str
     nueva_password: str = Field(min_length=8, max_length=72)
 
     _validar_password = field_validator("nueva_password")(validar_password_segura)
